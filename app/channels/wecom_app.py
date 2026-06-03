@@ -2,10 +2,14 @@ import json
 import time
 import hashlib
 import base64
+import logging
+import xml.etree.ElementTree as ET
 import requests
 from Crypto.Cipher import AES
 from typing import Optional, Dict, Any
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class WeComAppClient:
@@ -86,11 +90,20 @@ class WeComAppClient:
             sha1 = hashlib.sha1()
             for s in sort_list:
                 sha1.update(s.encode("utf-8"))
-            if sha1.hexdigest() != msg_signature:
+            calculated_signature = sha1.hexdigest()
+            logger.info(f"签名验证 - 计算值: {calculated_signature}, 接收值: {msg_signature}")
+            if calculated_signature != msg_signature:
+                logger.warning(f"签名不匹配! Token: {self.token[:6]}...")
                 return None
             msg = self._decrypt(encrypt)
-            return json.loads(msg)
-        except Exception:
+            logger.info(f"解密成功: {msg[:100]}...")
+            root = ET.fromstring(msg)
+            result = {}
+            for child in root:
+                result[child.tag] = child.text
+            return result
+        except Exception as e:
+            logger.error(f"解密异常: {e}")
             return None
 
     def send_text_message(
@@ -108,6 +121,9 @@ class WeComAppClient:
             "safe": 0,
         }
         data = {k: v for k, v in data.items() if v is not None}
+        logger.info(f"发送企微消息: touser={to_user}, agentid={self.app_id}")
         resp = requests.post(url, json=data, timeout=10)
         resp.raise_for_status()
-        return resp.json()
+        result = resp.json()
+        logger.info(f"企微发送结果: {result}")
+        return result

@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
+    log_level: str = "INFO"
 
     # 企业微信配置
     wecom_corp_id: str

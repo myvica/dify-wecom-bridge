@@ -1,10 +1,13 @@
 import json
+import logging
 from typing import Optional, Dict, Any
 from app.config import settings
 from app.storage.sqlite_client import SQLiteClient
 from app.storage.redis_client import RedisClient
 from app.channels.wecom_app import WeComAppClient
 from app.dify_clients.chatflow import DifyChatflowClient
+
+logger = logging.getLogger(__name__)
 
 
 class MessageHandler:
@@ -21,8 +24,10 @@ class MessageHandler:
         return f"wecom_app:{corp_id}:{agent_id}:{chat_type}:{external_user_id}:{chat_id}"
 
     def handle_wecom_message(self, msg_data: Dict[str, Any]) -> None:
+        logger.info(f"收到企微消息: {msg_data}")
         msg_type = msg_data.get("MsgType")
         if msg_type != "text":
+            logger.info(f"忽略非文本消息, MsgType={msg_type}")
             return
 
         corp_id = msg_data.get("ToUserName", "")
@@ -63,6 +68,8 @@ class MessageHandler:
             conversation_id=dify_conversation_id,
         )
 
+        logger.info(f"Dify响应: {dify_response}")
+
         self.sqlite_client.add_api_log(
             endpoint="/chat-messages",
             method="POST",
@@ -98,6 +105,8 @@ class MessageHandler:
 
         chat_type = msg_data.get("ChatType", "single")
         if chat_type == "single":
+            logger.info(f"发送消息给用户: {from_user}, 内容: {answer[:50]}...")
             self.wecom_client.send_text_message(to_user=from_user, content=answer)
         elif chat_type == "group":
+            logger.info(f"发送群消息: {from_user}, 内容: {answer[:50]}...")
             self.wecom_client.send_text_message(to_user=from_user, content=answer)

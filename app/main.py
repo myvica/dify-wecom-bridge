@@ -1,6 +1,12 @@
 from fastapi import FastAPI
+import logging
 from app.api import wecom_callback
 from app.config import settings
+
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 
 app = FastAPI(title="Dify WeCom Bridge v2", version="2.0.0")
 
