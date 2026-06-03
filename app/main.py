@@ -1,12 +1,25 @@
 from fastapi import FastAPI
 import logging
+from logging.handlers import RotatingFileHandler
 from app.api import wecom_callback
 from app.config import settings
 
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper(), logging.INFO),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+log_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+
+root_logger = logging.getLogger()
+root_logger.setLevel(log_level)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+root_logger.addHandler(console_handler)
+
+if settings.log_file:
+    file_handler = RotatingFileHandler(
+        settings.log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    file_handler.setFormatter(log_formatter)
+    root_logger.addHandler(file_handler)
 
 app = FastAPI(title="Dify WeCom Bridge v2", version="2.0.0")
 

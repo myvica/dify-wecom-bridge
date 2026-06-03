@@ -201,6 +201,41 @@ curl http://127.0.0.1:8000/health
 curl "http://127.0.0.1:8000/wecom/callback?msg_signature=test&timestamp=123&nonce=abc&echostr=test"
 ```
 
+### 方式三：Debian systemd 服务（推荐生产环境）
+
+适合生产部署，使用 systemctl 管理进程，支持开机自启和故障自动重启。
+
+```bash
+# 1. 按照方式二完成项目部署到 /opt/dify-wecom-bridge，并配置好 .env
+
+# 2. 复制服务文件
+sudo cp /opt/dify-wecom-bridge/deploy/dify-wecom-bridge.service /etc/systemd/system/
+
+# 3. 重载 systemd
+sudo systemctl daemon-reload
+
+# 4. 启动服务
+sudo systemctl start dify-wecom-bridge
+
+# 5. 设为开机自启
+sudo systemctl enable dify-wecom-bridge
+```
+
+常用命令：
+```bash
+# 查看状态
+sudo systemctl status dify-wecom-bridge
+
+# 查看日志
+sudo journalctl -u dify-wecom-bridge -f
+
+# 重启
+sudo systemctl restart dify-wecom-bridge
+
+# 停止
+sudo systemctl stop dify-wecom-bridge
+```
+
 > **注意**：`REDIS_HOST` 在不同部署方式下的取值不同：
 > | 部署方式 | REDIS_HOST |
 > |---|---|

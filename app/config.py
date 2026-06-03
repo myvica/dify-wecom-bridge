@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     port: int = 8000
     debug: bool = False
     log_level: str = "INFO"
+    log_file: Optional[str] = None
 
     # 企业微信配置
     wecom_corp_id: str
