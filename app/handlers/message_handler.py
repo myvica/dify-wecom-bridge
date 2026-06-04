@@ -2,20 +2,34 @@ import json
 import logging
 from typing import Optional, Dict, Any
 from app.config import settings
-from app.storage.sqlite_client import SQLiteClient
+from app.storage import create_storage
 from app.storage.redis_client import RedisClient
 from app.channels.wecom_app import WeComAppClient
 from app.dify_clients.chatflow import DifyChatflowClient
 
 logger = logging.getLogger(__name__)
 
+REDIS_CONV_TTL = 86400 * 7
+
 
 class MessageHandler:
     def __init__(self):
-        self.sqlite_client = SQLiteClient()
-        self.redis_client = RedisClient()
+        self.storage = create_storage()
+        self.redis = RedisClient()
         self.wecom_client = WeComAppClient()
         self.dify_client = DifyChatflowClient()
+
+    def _cache_key(self, session_key: str) -> str:
+        return f"conv:{session_key}"
+
+    def _get_cached_conversation(self, session_key: str) -> Optional[dict]:
+        return self.redis.get(self._cache_key(session_key))
+
+    def _set_cached_conversation(self, session_key: str, data: dict):
+        self.redis.set(self._cache_key(session_key), data, ex=REDIS_CONV_TTL)
+
+    def _invalidate_cache(self, session_key: str):
+        self.redis.delete(self._cache_key(session_key))
 
     def _build_session_key(
         self,
@@ -42,19 +56,22 @@ class MessageHandler:
             corp_id, str(agent_id), chat_type, from_user, chat_id
         )
 
-        conversation = self.sqlite_client.get_or_create_conversation(
-            session_key=session_key,
-            channel_type="wecom_app",
-            corp_id=corp_id,
-            agent_id=str(agent_id),
-            external_user_id=from_user,
-            chat_id=chat_id,
-            chat_type=chat_type,
-        )
+        conversation = self._get_cached_conversation(session_key)
+        if not conversation:
+            conversation = self.storage.get_or_create_conversation(
+                session_key=session_key,
+                channel_type="wecom_app",
+                corp_id=corp_id,
+                agent_id=str(agent_id),
+                external_user_id=from_user,
+                chat_id=chat_id,
+                chat_type=chat_type,
+            )
+            self._set_cached_conversation(session_key, conversation)
 
         dify_conversation_id = conversation.get("dify_conversation_id")
 
-        self.sqlite_client.add_message(
+        self.storage.add_message(
             session_key=session_key,
             role="user",
             content=content,
@@ -70,7 +87,7 @@ class MessageHandler:
 
         logger.info(f"Dify响应: {dify_response}")
 
-        self.sqlite_client.add_api_log(
+        self.storage.add_api_log(
             endpoint="/chat-messages",
             method="POST",
             request_body=dify_response.get("request_body"),
@@ -89,13 +106,15 @@ class MessageHandler:
         dify_message_id = dify_result.get("message_id")
 
         if new_dify_conversation_id and new_dify_conversation_id != dify_conversation_id:
-            self.sqlite_client.update_conversation_dify_id(
+            self.storage.update_conversation_dify_id(
                 session_key, new_dify_conversation_id
             )
+            self._invalidate_cache(session_key)
         else:
-            self.sqlite_client.update_conversation_last_message(session_key)
+            self.storage.update_conversation_last_message(session_key)
+            self._invalidate_cache(session_key)
 
-        self.sqlite_client.add_message(
+        self.storage.add_message(
             session_key=session_key,
             role="assistant",
             content=answer,

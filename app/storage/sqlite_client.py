@@ -1,11 +1,12 @@
 import sqlite3
 import os
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from datetime import datetime
 from app.config import settings
+from app.storage.base import BaseStorage
 
 
-class SQLiteClient:
+class SQLiteClient(BaseStorage):
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path or settings.sqlite_db_path
         self._ensure_db_dir()

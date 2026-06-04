@@ -15,6 +15,8 @@ console_handler.setFormatter(log_formatter)
 root_logger.addHandler(console_handler)
 
 if settings.log_file:
+    from pathlib import Path as _Path
+    _Path(settings.log_file).parent.mkdir(parents=True, exist_ok=True)
     file_handler = RotatingFileHandler(
         settings.log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
     )
