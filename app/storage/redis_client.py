@@ -14,8 +14,8 @@ class RedisClient:
     ):
         self.host = host or settings.redis_host
         self.port = port or settings.redis_port
-        self.db = db or settings.redis_db
-        self.password = password or settings.redis_password
+        self.db = db if db is not None else settings.redis_db
+        self.password = password if password is not None else settings.redis_password
         self._client: Optional[redis.Redis] = None
         self._connect()
 

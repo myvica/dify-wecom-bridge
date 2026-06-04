@@ -127,3 +127,6 @@ class WeComAppClient:
         result = resp.json()
         logger.info(f"企微发送结果: {result}")
         return result
+
+
+default_wecom_client = WeComAppClient()

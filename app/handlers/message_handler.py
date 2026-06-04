@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any
 from app.config import settings
 from app.storage import create_storage
 from app.storage.redis_client import RedisClient
-from app.channels.wecom_app import WeComAppClient
+from app.channels.wecom_app import default_wecom_client
 from app.dify_clients.chatflow import DifyChatflowClient
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ class MessageHandler:
     def __init__(self):
         self.storage = create_storage()
         self.redis = RedisClient()
-        self.wecom_client = WeComAppClient()
+        self.wecom_client = default_wecom_client
         self.dify_client = DifyChatflowClient()
 
     def _cache_key(self, session_key: str) -> str:
@@ -99,6 +99,10 @@ class MessageHandler:
 
         dify_result = dify_response.get("result", {})
         if not dify_result:
+            logger.error(f"Dify调用失败: {dify_response.get('error_message')}")
+            chat_type = msg_data.get("ChatType", "single")
+            if chat_type == "single":
+                self.wecom_client.send_text_message(to_user=from_user, content="服务暂时不可用，请稍后再试")
             return
 
         answer = dify_result.get("answer", "")
@@ -109,10 +113,11 @@ class MessageHandler:
             self.storage.update_conversation_dify_id(
                 session_key, new_dify_conversation_id
             )
-            self._invalidate_cache(session_key)
         else:
             self.storage.update_conversation_last_message(session_key)
-            self._invalidate_cache(session_key)
+
+        updated = self.storage.get_conversation(session_key)
+        self._set_cached_conversation(session_key, updated)
 
         self.storage.add_message(
             session_key=session_key,
