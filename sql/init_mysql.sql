@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL,
     raw_content TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_key) REFERENCES conversations(session_key),
     INDEX idx_messages_conversation (session_key),
     INDEX idx_messages_created (created_at)
 ) DEFAULT CHARSET=utf8mb4;

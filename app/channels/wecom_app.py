@@ -100,7 +100,7 @@ class WeComAppClient:
             calculated_signature = sha1.hexdigest()
             logger.info(f"签名验证 - 计算值: {calculated_signature}, 接收值: {msg_signature}")
             if calculated_signature != msg_signature:
-                logger.warning(f"签名不匹配! Token: {self.token[:6]}...")
+                logger.warning("签名不匹配!")
                 return None
             msg = self._decrypt(encrypt)
             logger.info(f"解密成功: {msg[:100]}...")

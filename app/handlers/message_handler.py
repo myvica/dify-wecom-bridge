@@ -85,7 +85,8 @@ class MessageHandler:
             conversation_id=dify_conversation_id,
         )
 
-        logger.info(f"Dify响应: {dify_response}")
+        logger.debug(f"Dify响应: {dify_response}")
+        logger.info(f"Dify响应完成: message_id={dify_response.get('result', {}).get('message_id', 'N/A')}, status={dify_response.get('status_code')}, duration={dify_response.get('duration_ms')}ms")
 
         self.storage.add_api_log(
             endpoint="/chat-messages",
