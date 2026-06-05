@@ -19,12 +19,51 @@
 - Dify Chatflow 对接
 - Redis + SQLite 会话管理
 - Docker 容器化部署
+- Bridge API（`/api/send`）供 Dify 工作流回调推送消息
 
 不包含：
 - 群机器人主链路
 - Workflow / Agent 首期实现
 - 数据分析模块
 - Web UI
+
+## 路线图
+
+### Phase 1 — 应用消息推送（当前）
+
+将 Dify 工作流的消息出口从群机器人 webhook 切换为自建应用消息（`cgi-bin/message/send`），规避 webhook 群发的风控风险。
+
+- [x] Bridge API（`POST /api/send`）支持 text / markdown 消息
+- [x] API Key 鉴权（`BRIDGE_API_KEY`）
+- [x] API 文档开关（`API_DOCS_ENABLED`）
+- [ ] Dify 工作流：webhook 节点 → HTTP 请求节点
+
+### Phase 2 — 智能机器人对接
+
+接入企微智能机器人 API 模式，实现店主在群聊或私聊中 @机器人 即可触发 Dify 生成文案，无需添加好友。
+
+- [ ] 智能机器人回调接收（复用现有加解密逻辑）
+- [ ] 通过 `response_url` 主动回复（markdown / 模板卡片）
+- [ ] 对接 Dify Chatflow 生成文案
+- [ ] 群聊 @机器人 + 私聊场景支持
+
+### Phase 3 — 微信客服对接
+
+接入微信客服 API，支持视频号、公众号、网页、小程序等外部渠道客户咨询，对接 Dify 自动回复。
+
+- [ ] 客服账号管理
+- [ ] 会话分配与消息收发
+- [ ] 接收消息回调对接 Dify Chatflow
+- [ ] 欢迎语 / 事件响应消息
+
+### Phase 4 — 客户联系群发 + 客户朋友圈
+
+接入客户联系 API，支持营销内容定向群发和客户朋友圈发布。
+
+- [ ] 创建企业群发（`/cgi-bin/externalcontact/add_msg_template`）
+- [ ] 客户群管理与标签筛选
+- [ ] 客户朋友圈发布
+- [ ] 群发记录与统计
 
 ## 目录规划
 
