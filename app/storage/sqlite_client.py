@@ -2,7 +2,7 @@ import sqlite3
 import os
 from typing import Optional, Dict, Any
 from datetime import datetime
-from app.config import settings
+from app.config import settings, BASE_DIR
 from app.storage.base import BaseStorage
 
 
@@ -18,8 +18,9 @@ class SQLiteClient(BaseStorage):
             os.makedirs(db_dir, exist_ok=True)
 
     def _init_db(self):
+        init_sql = BASE_DIR / "sql" / "init.sql"
         with sqlite3.connect(self.db_path) as conn:
-            with open("sql/init.sql", "r", encoding="utf-8") as f:
+            with open(str(init_sql), "r", encoding="utf-8") as f:
                 conn.executescript(f.read())
             conn.commit()
 

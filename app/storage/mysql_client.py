@@ -5,7 +5,7 @@ from datetime import datetime
 import pymysql
 import pymysql.cursors
 
-from app.config import settings
+from app.config import settings, BASE_DIR
 from app.storage.base import BaseStorage
 
 logger = logging.getLogger(__name__)
@@ -33,13 +33,14 @@ class MySQLClient(BaseStorage):
         conn = pymysql.connect(**init_kwargs)
         try:
             with conn.cursor() as cursor:
-                cursor.execute(
-                    f"CREATE DATABASE IF NOT EXISTS `{settings.mysql_database}` "
-                    "DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-                )
-            conn.select_db(settings.mysql_database)
-            with conn.cursor() as cursor:
-                with open("sql/init_mysql.sql", "r", encoding="utf-8") as f:
+                    cursor.execute(
+                        f"CREATE DATABASE IF NOT EXISTS `{settings.mysql_database}` "
+                        "DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                    )
+                conn.select_db(settings.mysql_database)
+                with conn.cursor() as cursor:
+                    init_sql = BASE_DIR / "sql" / "init_mysql.sql"
+                    with open(str(init_sql), "r", encoding="utf-8") as f:
                     for stmt in f.read().split(";"):
                         stmt = stmt.strip()
                         if stmt:

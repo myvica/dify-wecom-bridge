@@ -35,16 +35,26 @@ dify-wecom-bridge/
 │       └── docker-build.yml
 ├── app/
 │   ├── api/
+│   │   ├── send.py              # Bridge API（/api/send）
+│   │   └── wecom_callback.py    # 企微回调（/wecom/callback）
 │   ├── channels/
+│   │   └── wecom_app.py         # 企微客户端（加解密、发消息）
 │   ├── dify_clients/
+│   │   └── chatflow.py          # Dify Chatflow 客户端
 │   ├── handlers/
+│   │   └── message_handler.py   # 消息处理核心逻辑
 │   ├── storage/
-│   ├── config.py
-│   └── main.py
+│   │   ├── base.py              # 存储抽象基类
+│   │   ├── sqlite_client.py     # SQLite 实现
+│   │   ├── mysql_client.py      # MySQL/MariaDB 实现
+│   │   └── redis_client.py      # Redis 会话缓存
+│   ├── config.py                # 配置（pydantic-settings）
+│   └── main.py                  # FastAPI 入口
+├── deploy/
+│   └── dify-wecom-bridge.service  # systemd 服务文件
 ├── sql/
-│   └── init.sql
-├── docs/
-├── tests/
+│   ├── init.sql                 # SQLite 建表脚本
+│   └── init_mysql.sql           # MySQL 建表脚本
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
@@ -97,25 +107,56 @@ POST /chat-messages
 }
 ```
 
-## 数据库初始化
+## 数据库
 
-SQLite 初始化脚本位于：
+支持 SQLite 和 MySQL/MariaDB 双存储后端，通过 `DB_TYPE` 环境变量切换。
 
-[`sql/init.sql`](./sql/init.sql)
+### SQLite
 
-包含 3 张表：
-- `conversations`
-- `messages`
-- `api_logs`
+初始化脚本：[`sql/init.sql`](./sql/init.sql)
+默认路径：`./data/dify_wecom_bridge.db`
 
-## 计划中的最小路由
+### MySQL / MariaDB
+
+初始化脚本：[`sql/init_mysql.sql`](./sql/init_mysql.sql)
+建库建表由应用启动时自动完成，无需手动导入。
+
+### 包含的表
+
+| 表名 | 说明 |
+|---|---|
+| `conversations` | 会话记录，关联 Dify conversation_id |
+| `messages` | 消息历史（用户 + AI 回复） |
+| `api_logs` | Dify API 调用日志（调试用） |
+
+## 路由说明
 
 ```text
-GET  /health
-GET  /wecom/callback
-POST /wecom/callback
-GET  /admin/conversations   # 可选
+GET  /health                             # 健康检查
+GET  /wecom/callback                     # 企微 URL 验证
+POST /wecom/callback                     # 接收企微消息回调
+POST /api/send                           # Bridge API：主动发送消息
+GET  /admin/conversations   (可选)       # 会话管理
 ```
+
+### POST /api/send
+
+供 Dify Chatflow HTTP 请求节点调用的 Bridge API，将 AI 结果主动推送给企业微信用户。
+
+**请求体**：
+```json
+{
+  "content": "消息内容",
+  "to_user": "userid1|userid2",
+  "msg_type": "markdown",
+  "to_party": null,
+  "to_tag": null
+}
+```
+
+- `msg_type`：`text` 或 `markdown`
+- `to_user` / `to_party` / `to_tag`：与企微消息推送接口一致，多个用 `|` 分隔
+- 需要在请求头携带 `Authorization: Bearer <BRIDGE_API_KEY>`（若配置了 `BRIDGE_API_KEY`）
 
 ## 启动前需要准备
 
@@ -128,10 +169,18 @@ GET  /admin/conversations   # 可选
 
 Dify：
 - `DIFY_API_KEY`
-- `DIFY_BASE_URL`
+- `DIFY_BASE_URL`（默认 `https://api.dify.ai/v1`）
 
-SQLite：
-- `SQLITE_DB_PATH`（默认 `./data/dify_wecom_bridge.db`）
+Bridge API（可选）：
+- `BRIDGE_API_KEY`：Dify HTTP 请求节点调用 Bridge 时鉴权用，留空则不鉴权
+
+API 文档（可选）：
+- `API_DOCS_ENABLED`：设为 `True` 启用 `/docs` 和 `/redoc`，生产环境建议关闭
+
+数据库：
+- `DB_TYPE`：`sqlite`（默认）或 `mysql`
+- SQLite：`SQLITE_DB_PATH`（默认 `./data/dify_wecom_bridge.db`）
+- MySQL：`MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE`
 
 ## 部署方式
 
@@ -244,10 +293,8 @@ sudo systemctl stop dify-wecom-bridge
 
 ## CI/CD
 
-项目配置了 GitHub Actions，推送到 `main` 分支时自动构建 Docker 镜像并推送到 GitHub Container Registry（GHCR）。
+项目配置了自动构建 Docker 镜像并推送到 GitHub Container Registry（GHCR）。
 
-工作流文件：`.github/workflows/docker-build.yml`
-
-镜像地址：`ghcr.io/<owner>/dify-wecom-bridge:latest`
+镜像地址：`ghcr.io/myvica/dify-wecom-bridge:latest`
 
 

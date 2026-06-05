@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     dify_api_key: str
     dify_base_url: str = "https://api.dify.ai/v1"
 
+    # API 访问密钥（Dify HTTP 请求节点调用 Bridge 时鉴权）
+    bridge_api_key: str = ""
+
+    # 是否启用 API 文档（/docs 和 /redoc），生产环境建议关闭
+    api_docs_enabled: bool = False
+
     # 数据库配置: sqlite 或 mysql
     db_type: str = "sqlite"
 

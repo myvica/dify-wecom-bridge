@@ -46,9 +46,16 @@ class WeComAppClient:
         cipher = AES.new(aes_key, AES.MODE_CBC, iv)
         decrypted = cipher.decrypt(base64.b64decode(encrypt))
         pad = decrypted[-1]
+        if pad < 1 or pad > 32:
+            raise ValueError(f"无效的PKCS7填充值: {pad}")
+        if decrypted[-pad:] != bytes([pad]) * pad:
+            raise ValueError("PKCS7填充校验失败")
         decrypted = decrypted[:-pad]
         msg_len = int.from_bytes(decrypted[16:20], byteorder="big")
         msg = decrypted[20 : 20 + msg_len].decode("utf-8")
+        receive_id = decrypted[20 + msg_len:].decode("utf-8")
+        if receive_id != self.corp_id:
+            raise ValueError(f"接收方ID不匹配: 期望 {self.corp_id}, 实际 {receive_id}")
         return msg
 
     def _encrypt(self, msg: str) -> str:
@@ -107,7 +114,7 @@ class WeComAppClient:
             return None
 
     def send_text_message(
-        self, to_user: str, content: str, to_party: Optional[str] = None, to_tag: Optional[str] = None
+        self, to_user: str, content: str, to_party: Optional[str] = None, to_tag: Optional[str] = None, chatid: Optional[str] = None
     ) -> Dict[str, Any]:
         access_token = self._get_access_token()
         url = f"https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}"
@@ -120,12 +127,37 @@ class WeComAppClient:
             "text": {"content": content},
             "safe": 0,
         }
+        if chatid:
+            data["chatid"] = chatid
         data = {k: v for k, v in data.items() if v is not None}
-        logger.info(f"发送企微消息: touser={to_user}, agentid={self.app_id}")
+        logger.info(f"发送企微消息: touser={to_user}, agentid={self.app_id}, chatid={chatid}")
         resp = requests.post(url, json=data, timeout=10)
         resp.raise_for_status()
         result = resp.json()
         logger.info(f"企微发送结果: {result}")
+        return result
+
+    def send_markdown_message(
+        self, to_user: str, content: str, to_party: Optional[str] = None, to_tag: Optional[str] = None, chatid: Optional[str] = None
+    ) -> Dict[str, Any]:
+        access_token = self._get_access_token()
+        url = f"https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}"
+        data = {
+            "touser": to_user,
+            "toparty": to_party,
+            "totag": to_tag,
+            "msgtype": "markdown",
+            "agentid": int(self.app_id),
+            "markdown": {"content": content},
+        }
+        if chatid:
+            data["chatid"] = chatid
+        data = {k: v for k, v in data.items() if v is not None}
+        logger.info(f"发送企微Markdown消息: touser={to_user}, agentid={self.app_id}, chatid={chatid}")
+        resp = requests.post(url, json=data, timeout=10)
+        resp.raise_for_status()
+        result = resp.json()
+        logger.info(f"企微Markdown发送结果: {result}")
         return result
 
 

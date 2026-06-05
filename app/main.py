@@ -2,6 +2,7 @@ from fastapi import FastAPI
 import logging
 from logging.handlers import RotatingFileHandler
 from app.api import wecom_callback
+from app.api import send
 from app.config import settings
 
 log_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -23,9 +24,15 @@ if settings.log_file:
     file_handler.setFormatter(log_formatter)
     root_logger.addHandler(file_handler)
 
-app = FastAPI(title="Dify WeCom Bridge v2", version="2.0.0")
+app = FastAPI(
+    title="Dify WeCom Bridge v2",
+    version="2.0.0",
+    docs_url="/docs" if settings.api_docs_enabled else None,
+    redoc_url="/redoc" if settings.api_docs_enabled else None,
+)
 
 app.include_router(wecom_callback.router)
+app.include_router(send.router)
 
 
 @app.get("/")
