@@ -104,6 +104,8 @@ class MessageHandler:
             chat_type = msg_data.get("ChatType", "single")
             if chat_type == "single":
                 self.wecom_client.send_text_message(to_user=from_user, content="服务暂时不可用，请稍后再试")
+            elif chat_type == "group":
+                self.wecom_client.send_text_message(to_user="@all", content="服务暂时不可用，请稍后再试", chatid=chat_id)
             return
 
         answer = dify_result.get("answer", "")
@@ -133,5 +135,5 @@ class MessageHandler:
             logger.info(f"发送消息给用户: {from_user}, 内容: {answer[:50]}...")
             self.wecom_client.send_text_message(to_user=from_user, content=answer)
         elif chat_type == "group":
-            logger.info(f"发送群消息: {from_user}, 内容: {answer[:50]}...")
-            self.wecom_client.send_text_message(to_user=from_user, content=answer)
+            logger.info(f"发送群消息: chat_id={chat_id}, 内容: {answer[:50]}...")
+            self.wecom_client.send_text_message(to_user="@all", content=answer, chatid=chat_id)
