@@ -113,7 +113,13 @@ class MessageHandler:
             logger.error(f"Dify调用失败: {dify_response.get('error_message')}")
             chat_type = msg_data.get("ChatType", "single")
             if chat_type == "single":
-                self.wecom_client.send_text_message(to_user=from_user, content="服务暂时不可用，请稍后再试")
+                resp = self.wecom_client.send_text_message(to_user=from_user, content="服务暂时不可用，请稍后再试")
+                if resp.get("errcode") != 0:
+                    logger.error(f"发送单聊错误通知失败: {resp}")
+            elif chat_type == "group":
+                resp = self.wecom_client.send_text_message(to_user="", content="服务暂时不可用，请稍后再试", chatid=chat_id)
+                if resp.get("errcode") != 0:
+                    logger.error(f"发送群聊错误通知失败: {resp}")
             return
 
         answer = dify_result.get("answer", "")
@@ -142,7 +148,11 @@ class MessageHandler:
         chat_type = msg_data.get("ChatType", "single")
         if chat_type == "single":
             logger.info(f"发送消息给用户: {from_user}, 内容: {answer[:50]}...")
-            self.wecom_client.send_text_message(to_user=from_user, content=answer)
+            resp = self.wecom_client.send_text_message(to_user=from_user, content=answer)
+            if resp.get("errcode") != 0:
+                logger.error(f"发送单聊消息失败: {resp}")
         elif chat_type == "group":
-            logger.info(f"发送群消息: {from_user}, 内容: {answer[:50]}...")
-            self.wecom_client.send_text_message(to_user=from_user, content=answer)
+            logger.info(f"发送群消息: chat_id={chat_id}, 内容: {answer[:50]}...")
+            resp = self.wecom_client.send_text_message(to_user="", content=answer, chatid=chat_id)
+            if resp.get("errcode") != 0:
+                logger.error(f"发送群聊消息失败: {resp}")

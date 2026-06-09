@@ -1,3 +1,4 @@
+import hmac
 import json
 import time
 import hashlib
@@ -83,10 +84,12 @@ class WeComAppClient:
             sha1 = hashlib.sha1()
             for s in sort_list:
                 sha1.update(s.encode("utf-8"))
-            if sha1.hexdigest() != msg_signature:
+            if not hmac.compare_digest(sha1.hexdigest(), msg_signature):
+                logger.warning(f"URL验证签名不匹配: 计算值={sha1.hexdigest()}, 接收值={msg_signature}")
                 return None
             return self._decrypt(echostr)
         except Exception:
+            logger.exception("URL验证异常")
             return None
 
     def decrypt_message(
@@ -99,7 +102,7 @@ class WeComAppClient:
                 sha1.update(s.encode("utf-8"))
             calculated_signature = sha1.hexdigest()
             logger.info(f"签名验证 - 计算值: {calculated_signature}, 接收值: {msg_signature}")
-            if calculated_signature != msg_signature:
+            if not hmac.compare_digest(calculated_signature, msg_signature):
                 logger.warning("签名不匹配!")
                 return None
             msg = self._decrypt(encrypt)
@@ -129,6 +132,9 @@ class WeComAppClient:
         }
         if chatid:
             data["chatid"] = chatid
+            data.pop("touser", None)
+            data.pop("toparty", None)
+            data.pop("totag", None)
         data = {k: v for k, v in data.items() if v is not None}
         logger.info(f"发送企微消息: touser={to_user}, agentid={self.app_id}, chatid={chatid}")
         resp = requests.post(url, json=data, timeout=10)
@@ -149,9 +155,13 @@ class WeComAppClient:
             "msgtype": "markdown",
             "agentid": int(self.app_id),
             "markdown": {"content": content},
+            "safe": 0,
         }
         if chatid:
             data["chatid"] = chatid
+            data.pop("touser", None)
+            data.pop("toparty", None)
+            data.pop("totag", None)
         data = {k: v for k, v in data.items() if v is not None}
         logger.info(f"发送企微Markdown消息: touser={to_user}, agentid={self.app_id}, chatid={chatid}")
         resp = requests.post(url, json=data, timeout=10)
