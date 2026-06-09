@@ -45,8 +45,24 @@ class MySQLClient(BaseStorage):
                         stmt = stmt.strip()
                         if stmt:
                             cursor.execute(stmt)
+                self._ensure_schema(cursor)
         finally:
             conn.close()
+
+    def _ensure_schema(self, cursor):
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = %s
+              AND TABLE_NAME = 'messages'
+              AND COLUMN_NAME = 'reference_info'
+            """,
+            (settings.mysql_database,),
+        )
+        row = cursor.fetchone()
+        if not row or row.get("count", 0) == 0:
+            cursor.execute("ALTER TABLE messages ADD COLUMN reference_info TEXT AFTER content")
 
     def get_or_create_conversation(
         self,
@@ -136,6 +152,7 @@ class MySQLClient(BaseStorage):
         content: str,
         dify_message_id: Optional[str] = None,
         wecom_msg_id: Optional[str] = None,
+        reference_info: Optional[str] = None,
         raw_content: Optional[str] = None,
     ):
         with self._get_connection() as conn:
@@ -145,8 +162,8 @@ class MySQLClient(BaseStorage):
                     """
                     INSERT INTO messages
                     (session_key, dify_message_id, wecom_msg_id, role, content,
-                     raw_content, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                     reference_info, raw_content, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         session_key,
@@ -154,10 +171,28 @@ class MySQLClient(BaseStorage):
                         wecom_msg_id,
                         role,
                         content,
+                        reference_info,
                         raw_content,
                         now,
                     ),
                 )
+
+    def cleanup_api_log_response_bodies(self, retention_days: int) -> int:
+        if retention_days <= 0:
+            return 0
+
+        with self._get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE api_logs
+                    SET response_body = NULL
+                    WHERE response_body IS NOT NULL
+                      AND created_at < DATE_SUB(NOW(), INTERVAL %s DAY)
+                    """,
+                    (retention_days,),
+                )
+                return cursor.rowcount
 
     def add_api_log(
         self,
@@ -190,3 +225,5 @@ class MySQLClient(BaseStorage):
                         now,
                     ),
                 )
+                if not settings.debug:
+                    self.cleanup_api_log_response_bodies(settings.api_log_response_retention_days)

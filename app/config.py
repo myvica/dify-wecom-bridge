@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # 是否启用 API 文档（/docs 和 /redoc），生产环境建议关闭
     api_docs_enabled: bool = False
 
+    # API 响应体保留天数；debug 模式下暂停清理，便于排障
+    api_log_response_retention_days: int = 14
+
     # 数据库配置: sqlite 或 mysql
     db_type: str = "sqlite"
 

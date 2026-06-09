@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS messages (
     wecom_msg_id VARCHAR(255),
     role VARCHAR(20) NOT NULL,
     content TEXT NOT NULL,
+    reference_info TEXT,
     raw_content TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_key) REFERENCES conversations(session_key),

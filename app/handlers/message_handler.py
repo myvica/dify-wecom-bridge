@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Optional, Dict, Any
 from app.config import settings
 from app.storage import create_storage
@@ -36,6 +37,15 @@ class MessageHandler:
         corp_id: str, agent_id: str, chat_type: str, external_user_id: str, chat_id: str
     ) -> str:
         return f"wecom_app:{corp_id}:{agent_id}:{chat_type}:{external_user_id}:{chat_id}"
+
+    def _extract_reference_info(self, answer: str) -> Optional[str]:
+        first_line = answer.splitlines()[0].strip() if answer else ""
+        if "信息：" not in first_line and "信息:" not in first_line:
+            return None
+
+        cleaned = re.sub(r"\s+", "", cleaned)
+        cleaned = cleaned.replace("，，", "，").replace("：，", "：").strip(" ，,")
+        return cleaned or None
 
     def handle_wecom_message(self, msg_data: Dict[str, Any]) -> None:
         logger.info(f"收到企微消息: {msg_data}")
@@ -107,6 +117,7 @@ class MessageHandler:
             return
 
         answer = dify_result.get("answer", "")
+        reference_info = self._extract_reference_info(answer)
         new_dify_conversation_id = dify_result.get("conversation_id")
         dify_message_id = dify_result.get("message_id")
 
@@ -125,7 +136,7 @@ class MessageHandler:
             role="assistant",
             content=answer,
             dify_message_id=dify_message_id,
-            raw_content=json.dumps(dify_result, ensure_ascii=False),
+            reference_info=reference_info,
         )
 
         chat_type = msg_data.get("ChatType", "single")

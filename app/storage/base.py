@@ -34,8 +34,12 @@ class BaseStorage(ABC):
         content: str,
         dify_message_id: Optional[str] = None,
         wecom_msg_id: Optional[str] = None,
+        reference_info: Optional[str] = None,
         raw_content: Optional[str] = None,
     ): ...
+
+    @abstractmethod
+    def cleanup_api_log_response_bodies(self, retention_days: int) -> int: ...
 
     @abstractmethod
     def add_api_log(

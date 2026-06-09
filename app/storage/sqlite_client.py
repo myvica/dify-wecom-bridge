@@ -22,7 +22,15 @@ class SQLiteClient(BaseStorage):
         with sqlite3.connect(self.db_path) as conn:
             with open(str(init_sql), "r", encoding="utf-8") as f:
                 conn.executescript(f.read())
+            self._ensure_schema(conn)
             conn.commit()
+
+    def _ensure_schema(self, conn: sqlite3.Connection):
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(messages)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "reference_info" not in columns:
+            cursor.execute("ALTER TABLE messages ADD COLUMN reference_info TEXT")
 
     def _get_connection(self):
         conn = sqlite3.connect(self.db_path)
@@ -118,6 +126,7 @@ class SQLiteClient(BaseStorage):
         content: str,
         dify_message_id: Optional[str] = None,
         wecom_msg_id: Optional[str] = None,
+        reference_info: Optional[str] = None,
         raw_content: Optional[str] = None,
     ):
         with self._get_connection() as conn:
@@ -126,8 +135,8 @@ class SQLiteClient(BaseStorage):
             cursor.execute(
                 """
                 INSERT INTO messages
-                (session_key, dify_message_id, wecom_msg_id, role, content, raw_content, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (session_key, dify_message_id, wecom_msg_id, role, content, reference_info, raw_content, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session_key,
@@ -135,11 +144,32 @@ class SQLiteClient(BaseStorage):
                     wecom_msg_id,
                     role,
                     content,
+                    reference_info,
                     raw_content,
                     now,
                 ),
             )
             conn.commit()
+
+    def cleanup_api_log_response_bodies(self, retention_days: int) -> int:
+        if retention_days <= 0:
+            return 0
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE api_logs
+                SET response_body = NULL
+                WHERE response_body IS NOT NULL
+                  AND created_at < datetime('now', ?)
+                """,
+                (f"-{retention_days} days",),
+            )
+            conn.commit()
+            if not settings.debug:
+                self.cleanup_api_log_response_bodies(settings.api_log_response_retention_days)
+            return cursor.rowcount
 
     def add_api_log(
         self,
